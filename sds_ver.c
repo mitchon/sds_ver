@@ -46,42 +46,43 @@ char GetParams (char* path, mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t x
 	return 0;
 }
 
-int GetUserKeys (char *login, mpz_t xQ, mpz_t yQ)
+int GetUserKeys (mpz_t xQ, mpz_t yQ, int iteration, char* login)
 {
 	FILE *keys;
-	char loginfound = 0;
-	int num = 0;
 	char buffer[256];
 	if ((keys = fopen("public_accounts.sdspa", "rb")) == NULL)
 	{
 		printf("Error reading accounts info");
 		return -1;
 	}
-	while (feof(keys) == 0 && loginfound == 0)
+	if (feof(keys) == 0)
 	{
-		fgets(buffer, 256, keys);
-		if (num % 3 == 0)
+		for (int i = 0; i<iteration; i++)
 		{
-			for (int i=0; i<256; i++)
-			{
-				if (buffer[i] == 0x0A)
-					buffer[i]=0;
-			}
-			if (strcmp(buffer, login) == 0)
-			{
-				printf("login: %s\n", login);
-				loginfound = 1;
-			}
+			fgets(buffer, 256, keys);
+			fgets(buffer, 256, keys);
+			fgets(buffer, 256, keys);
 		}
-		num++;
+		if (feof(keys) != 0)
+		{
+			printf("End of file reached, no matches");
+			return -1;
+		}
+		fgets(buffer, 256, keys);
+		//узнать логин
 	}
-	if (feof(keys) != 0 && loginfound == 0)
+	else
 	{
-		printf("User not found\n");
+		printf("End of file reached, no matches");
 		return -1;
 	}
-	mpz_init(xQ);
-	mpz_init(yQ);
+	
+	for (int i=0; i<256; i++)
+	{
+		if (buffer[i] == 0x0A)
+			buffer[i]=0;
+		login[i]=buffer[i];
+	}
 	
 	mpz_inp_str (xQ, keys, 16);
 	mpz_inp_str (yQ, keys, 16);
@@ -109,7 +110,10 @@ void GenerateHashFromFile(FILE *file, unsigned char *h)
 
 void CheckDS(mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t xP, mpz_t yP, mpz_t xQ, mpz_t yQ, FILE *file)
 {
-	char result = 0; 
+	char result = 0;
+	int keysfstat = 0;
+	int it = 0;
+	char login[256];
 	mpz_t e, alpha, nu, s, r, z1, z2, xC, yC, xC1, yC1, R;
 	unsigned char *h;
 	mpz_init(e);
@@ -122,55 +126,69 @@ void CheckDS(mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t xP, mpz_t yP, mp
 	mpz_init(xC);
 	mpz_init(yC);
 	mpz_init(R);
-	mpz_set_str(xQ, "7F2B49E270DB6D90D8595BEC458B50C58585BA1D4E9B788F6689DBD8E56FD80B", 16);
-	mpz_set_str(yQ, "26F1B489D6701DD185C8413A977B3CBBAF64D1C593D26627DFFB101A87FF77DA", 16);
-	gmp_printf("xQ = %Zx\n"
-			"yQ = %Zx\n", xQ, yQ);
-	
-	//получение хеш-кода
-	/*GenerateHashFromFile(file, h);
-	//получить альфа, число, двоичным представлением которого является h
-	mpz_import(alpha, 32, 1, 1, 1, 0, h);
-	gmp_printf("alpha = %Zx\n", alpha);
-	//а ещё тут надо добавить получение s и r
-	//получить e
-	mpz_mod(e, alpha, q);*/
-	mpz_set_str(e, "2DFBC1B372D89A1188C09C52E0EEC61FCE52032AB1022E8E67ECE6672B043EE5", 16);
-	mpz_set_str(s, "1456C64BA4642A1653C235A98A60249BCD6D3F746B631DF928014F6C5BF9C40", 16);
-	mpz_set_str(r, "41AA28D2F1AB148280CD9ED56FEDA41974053554A42767B83AD043FD39DC0493", 16);
-	gmp_printf("r = %Zx\n"
-			"s = %Zx\n", r, s);
-	gmp_printf("e = %Zx\n", e);
-	//получить ню
-	Revers(q, e, nu);
-	gmp_printf("nu = %Zx\n", nu);
-	//z1=s*nu (mod q)
-	mpz_mul(z1, s, nu);
-	mpz_mod(z1, z1, q);	
-	//z2=-r*nu (mod q)
-	mpz_mul(z2, r, nu);
-	mpz_neg(z2, z2);
-	mpz_mod(z2, z2, q);
-	gmp_printf("z1 = %Zx\n"
-			"z2 = %Zx\n", z1, z2);
+	while (result == 0)
+	{
+		keysfstat = GetUserKeys(xQ, yQ, it, login);
+		if (keysfstat != 0)
+		{
+			return;
+		}
+		it++;
+		/*mpz_set_str(xQ, "7F2B49E270DB6D90D8595BEC458B50C58585BA1D4E9B788F6689DBD8E56FD80B", 16);
+		mpz_set_str(yQ, "26F1B489D6701DD185C8413A977B3CBBAF64D1C593D26627DFFB101A87FF77DA", 16);
+		gmp_printf("xQ = %Zx\n"
+				"yQ = %Zx\n", xQ, yQ);*/
+		
+		//получение хеш-кода
+		/*GenerateHashFromFile(file, h);
+		//получить альфа, число, двоичным представлением которого является h
+		mpz_import(alpha, 32, 1, 1, 1, 0, h);
+		gmp_printf("alpha = %Zx\n", alpha);
+		//а ещё тут надо добавить получение s и r
+		//получить e
+		mpz_mod(e, alpha, q);*/
+		mpz_set_str(e, "2DFBC1B372D89A1188C09C52E0EEC61FCE52032AB1022E8E67ECE6672B043EE5", 16);
+		mpz_set_str(s, "1456C64BA4642A1653C235A98A60249BCD6D3F746B631DF928014F6C5BF9C40", 16);
+		mpz_set_str(r, "41AA28D2F1AB148280CD9ED56FEDA41974053554A42767B83AD043FD39DC0493", 16);
+		gmp_printf("r = %Zx\n"
+				"s = %Zx\n", r, s);
+		gmp_printf("e = %Zx\n", e);
+		//получить ню
+		Revers(q, e, nu);
+		gmp_printf("nu = %Zx\n", nu);
+		//z1=s*nu (mod q)
+		mpz_mul(z1, s, nu);
+		mpz_mod(z1, z1, q);	
+		//z2=-r*nu (mod q)
+		mpz_mul(z2, r, nu);
+		mpz_neg(z2, z2);
+		mpz_mod(z2, z2, q);
+		gmp_printf("z1 = %Zx\n"
+				"z2 = %Zx\n", z1, z2);
 
-	//C=z1*P+z2*Q
-	mpz_init(xC1);
-	mpz_init(yC1);
-	PointMul(p, a, xP, yP, z1, xC1, yC1);
-	PointMul(p, a, xQ, yQ, z2, xC, yC);
-	PointSum(p, a, xC1, yC1, xC, yC, xC, yC);
-	mpz_clear(xC1);
-	mpz_clear(yC1);
-	gmp_printf("xC = %Zx\n"
-			"yC = %Zx\n", xC, yC);
+		//C=z1*P+z2*Q
+		mpz_init(xC1);
+		mpz_init(yC1);
+		PointMul(p, a, xP, yP, z1, xC1, yC1);
+		PointMul(p, a, xQ, yQ, z2, xC, yC);
+		PointSum(p, a, xC1, yC1, xC, yC, xC, yC);
+		mpz_clear(xC1);
+		mpz_clear(yC1);
+		gmp_printf("xC = %Zx\n"
+				"yC = %Zx\n", xC, yC);
 
-	mpz_mod(R, xC, q);
-	if (mpz_cmp(R, r) == 0)
-		printf("You Win!");
-	else
-		printf("You Lose:(");
-
+		mpz_mod(R, xC, q);
+		if (mpz_cmp(R, r) == 0)
+		{
+			printf("You Win!\n");
+			printf("Owner is %s\n", login);
+			result = 1;
+		}
+		else
+			printf("Next\n");
+	}
+	if (result == 0)
+		printf("You lost!\n");
 	mpz_clear(e);
 	mpz_clear(alpha);
 	mpz_clear(nu);
@@ -199,7 +217,7 @@ int main(int argc, char** argv)
 	if (strcmp(argv[1], "-h") == 0 && argc == 2)
 	{
 		printf("-h				Get help;\n");
-		printf("-ds <login> <path to file>	Generate digital signature for chosen file using current parameters;\n");
+		printf("-ds <path to file>	Generate digital signature for chosen file using current parameters;\n");
 		printf("-p <path to file>		Use signature parameters and table from .sdsp file;\n");
 		printf("Parameters used by default at the start of this program are contained in ds_params.spsd\n");
 		return 0;
@@ -227,26 +245,20 @@ int main(int argc, char** argv)
 	parfstatus += GetParams("ds_params.sdsp", p, a, b, m, q, xP, yP);
 
 	//проверка подписи
-	if (strcmp(argv[1], "-ds") == 0 && argc == 4)
+	if (strcmp(argv[1], "-ds") == 0 && argc == 3)
 	{
 		if (parfstatus == 0)
 		{
-			char fail = 0;
 			FILE *target;
-			//получение ключей из файла пользователя
-			fail += GetUserKeys(argv[2], xQ, yQ);
 			//открытие целевого файла
-			if ((target = fopen(argv[3], "r+b")) == NULL)
+			if ((target = fopen(argv[2], "r+b")) == NULL)
 			{
 				printf("Error reading target file");
-				fail += 1;
+				Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
+				return 0;
 			}
-
-			if (fail == 0)
-			{
-				//генерация подписи, добавление к файлу
-				CheckDS(p, a, b, m, q, xP, yP, xQ, yQ, target);
-			}
+			//генерация подписи, добавление к файлу
+			CheckDS(p, a, b, m, q, xP, yP, xQ, yQ, target);
 			fclose(target);
 		}
 		//если параметры не получены
@@ -257,7 +269,7 @@ int main(int argc, char** argv)
 		return 0;
 	}
 	//кол-во параметров неверно
-	else if (strcmp(argv[1], "-ds") == 0 && argc != 4)
+	else if (strcmp(argv[1], "-ds") == 0 && argc != 3)
 	{
 		printf("Incorrect number of arguments");
 		Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
