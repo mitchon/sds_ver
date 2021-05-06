@@ -68,8 +68,8 @@ int GetUserKeys (mpz_t xQ, mpz_t yQ, int iteration, char* login)
 			printf("End of file reached, no matches");
 			return -1;
 		}
-		fgets(buffer, 256, keys);
 		//узнать логин
+		fgets(buffer, 256, keys);
 	}
 	else
 	{
@@ -92,19 +92,32 @@ int GetUserKeys (mpz_t xQ, mpz_t yQ, int iteration, char* login)
 	return 0;
 }
 
-void GenerateHashFromFile(FILE *file, unsigned char *h)
+unsigned char *GenerateHashFromFile(FILE *file)
 {
-	fseek(file, 0, SEEK_END);
+	fseek(file, -64, SEEK_END);
 	long fsize = ftell(file);
+	printf("size= %d\n", fsize);
 	fseek(file, 0, SEEK_SET);
 	unsigned char *content = (unsigned char *)malloc(fsize + 1);
 	fread(content, 1, fsize, file);
 	
-	h=hash256(content, fsize);
+	unsigned char *h=hash256(content, fsize);
     printf("h: ");
     for (int i=0; i<32; i++)
         printf("%x ", h[i]);
 	printf("\n");
+	free(content);
+	return h;
+}
+
+void GetRSFromFile(FILE *file, mpz_t r, mpz_t s)
+{
+	fseek(file, -64, SEEK_END);
+	unsigned char *content = (unsigned char *)malloc(32);
+	fread(content, 1, 32, file);
+	mpz_import(r, 32, 1, 1, 1, 0, content);
+	fread(content, 1, 32, file);
+	mpz_import(s, 32, 1, 1, 1, 0, content);
 	free(content);
 }
 
@@ -114,7 +127,7 @@ void CheckDS(mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t xP, mpz_t yP, mp
 	int keysfstat = 0;
 	int it = 0;
 	char login[256];
-	mpz_t e, alpha, nu, s, r, z1, z2, xC, yC, xC1, yC1, R;
+	mpz_t e, alpha, nu, s, r, z1, z2, xC, yC, xC1, yC1,xC2, yC2, R;
 	unsigned char *h;
 	mpz_init(e);
 	mpz_init(alpha);
@@ -125,7 +138,43 @@ void CheckDS(mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t xP, mpz_t yP, mp
 	mpz_init(z2);
 	mpz_init(xC);
 	mpz_init(yC);
+	mpz_init(xC1);
+	mpz_init(yC1);
+	mpz_init(xC2);
+	mpz_init(yC2);
 	mpz_init(R);
+
+		
+	//получение хеш-кода
+	h = GenerateHashFromFile(file);
+	printf("h: ");
+	for (int i=0; i<32; i++)
+		printf("%x ", h[i]);
+	printf("\n");
+	//получить альфа, число, двоичным представлением которого является h
+	mpz_import(alpha, 32, 1, 1, 1, 0, h);
+	gmp_printf("alpha = %Zx\n", alpha);
+	GetRSFromFile(file, r, s);
+	gmp_printf("r = %Zx\n", r);
+	gmp_printf("s = %Zx\n", s);
+	//получить e
+	mpz_mod(e, alpha, q);
+	gmp_printf("e = %Zx\n", e);
+	//получить ню
+	Revers(q, e, nu);
+	gmp_printf("nu = %Zx\n", nu);
+	//z1=s*nu (mod q)
+	mpz_mul(z1, s, nu);
+	mpz_mod(z1, z1, q);	
+	//z2=-r*nu (mod q)
+	mpz_mul(z2, r, nu);
+	mpz_neg(z2, z2);
+	mpz_mod(z2, z2, q);
+	gmp_printf("z1 = %Zx\n"
+			"z2 = %Zx\n", z1, z2);
+	
+	PointMul(p, a, xP, yP, z1, xC1, yC1);
+
 	while (result == 0)
 	{
 		keysfstat = GetUserKeys(xQ, yQ, it, login);
@@ -134,61 +183,25 @@ void CheckDS(mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t xP, mpz_t yP, mp
 			return;
 		}
 		it++;
-		/*mpz_set_str(xQ, "7F2B49E270DB6D90D8595BEC458B50C58585BA1D4E9B788F6689DBD8E56FD80B", 16);
-		mpz_set_str(yQ, "26F1B489D6701DD185C8413A977B3CBBAF64D1C593D26627DFFB101A87FF77DA", 16);
-		gmp_printf("xQ = %Zx\n"
-				"yQ = %Zx\n", xQ, yQ);*/
-		
-		//получение хеш-кода
-		/*GenerateHashFromFile(file, h);
-		//получить альфа, число, двоичным представлением которого является h
-		mpz_import(alpha, 32, 1, 1, 1, 0, h);
-		gmp_printf("alpha = %Zx\n", alpha);
-		//а ещё тут надо добавить получение s и r
-		//получить e
-		mpz_mod(e, alpha, q);*/
-		mpz_set_str(e, "2DFBC1B372D89A1188C09C52E0EEC61FCE52032AB1022E8E67ECE6672B043EE5", 16);
-		mpz_set_str(s, "1456C64BA4642A1653C235A98A60249BCD6D3F746B631DF928014F6C5BF9C40", 16);
-		mpz_set_str(r, "41AA28D2F1AB148280CD9ED56FEDA41974053554A42767B83AD043FD39DC0493", 16);
-		gmp_printf("r = %Zx\n"
-				"s = %Zx\n", r, s);
-		gmp_printf("e = %Zx\n", e);
-		//получить ню
-		Revers(q, e, nu);
-		gmp_printf("nu = %Zx\n", nu);
-		//z1=s*nu (mod q)
-		mpz_mul(z1, s, nu);
-		mpz_mod(z1, z1, q);	
-		//z2=-r*nu (mod q)
-		mpz_mul(z2, r, nu);
-		mpz_neg(z2, z2);
-		mpz_mod(z2, z2, q);
-		gmp_printf("z1 = %Zx\n"
-				"z2 = %Zx\n", z1, z2);
 
 		//C=z1*P+z2*Q
-		mpz_init(xC1);
-		mpz_init(yC1);
-		PointMul(p, a, xP, yP, z1, xC1, yC1);
-		PointMul(p, a, xQ, yQ, z2, xC, yC);
-		PointSum(p, a, xC1, yC1, xC, yC, xC, yC);
-		mpz_clear(xC1);
-		mpz_clear(yC1);
+		PointMul(p, a, xQ, yQ, z2, xC2, yC2);
+		PointSum(p, a, xC2, yC2, xC1, yC1, xC, yC);
 		gmp_printf("xC = %Zx\n"
 				"yC = %Zx\n", xC, yC);
 
 		mpz_mod(R, xC, q);
 		if (mpz_cmp(R, r) == 0)
 		{
-			printf("You Win!\n");
+			printf("Owner of this document is found!\n");
 			printf("Owner is %s\n", login);
 			result = 1;
 		}
 		else
-			printf("Next\n");
+			printf("Next try\n");
 	}
 	if (result == 0)
-		printf("You lost!\n");
+		printf("No result!\n");
 	mpz_clear(e);
 	mpz_clear(alpha);
 	mpz_clear(nu);
@@ -198,6 +211,10 @@ void CheckDS(mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t xP, mpz_t yP, mp
 	mpz_clear(z2);
 	mpz_clear(xC);
 	mpz_clear(yC);
+	mpz_clear(xC1);
+	mpz_clear(yC1);
+	mpz_clear(xC2);
+	mpz_clear(yC2);
 	mpz_clear(R);
 	free(h);
 }
@@ -251,7 +268,7 @@ int main(int argc, char** argv)
 		{
 			FILE *target;
 			//открытие целевого файла
-			if ((target = fopen(argv[2], "r+b")) == NULL)
+			if ((target = fopen(argv[2], "r")) == NULL)
 			{
 				printf("Error reading target file");
 				Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
