@@ -3,7 +3,7 @@ Simple digital signature verifier based on standart GOST 34.10-2018
 This program is used to verify 256bit digital signature to the end of the file based on given parameters
 
 [Automatic DS verifier](https://github.com/mitchon/sds_ver_auto)  
-[DS venerator](https://github.com/mitchon/sds_gen)  
+[DS generator](https://github.com/mitchon/sds_gen)  
 
 Tested in Ubuntu 20.04 LTS
 
