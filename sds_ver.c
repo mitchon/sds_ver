@@ -25,7 +25,7 @@ char GetParams (char* path, mpz_t p, mpz_t a, mpz_t b, mpz_t m, mpz_t q, mpz_t x
 	FILE* params;
 	if ((params = fopen(path, "r")) == NULL)
 	{
-		printf("Error. File \"ds_params.sdsp\" not found. Generate or import parameters file\n");
+		printf("Error. File \"ds_params\" not found. Generate or import parameters file\n");
 		return -1;
 	}
 	mpz_inp_str (p, params, 16);
@@ -50,9 +50,9 @@ int GetUserKeys (mpz_t xQ, mpz_t yQ, int iteration, char* login)
 {
 	FILE *keys;
 	char buffer[256];
-	if ((keys = fopen("public_accounts.sdspa", "rb")) == NULL)
+	if ((keys = fopen("/usr/local/etc/sds/public_accounts", "rb")) == NULL)
 	{
-		printf("Error reading accounts info");
+		printf("Error reading accounts info\n");
 		return -1;
 	}
 	if (feof(keys) == 0)
@@ -65,7 +65,7 @@ int GetUserKeys (mpz_t xQ, mpz_t yQ, int iteration, char* login)
 		}
 		if (feof(keys) != 0)
 		{
-			printf("End of file reached, no matches");
+			printf("End of file reached, no matches\n");
 			return -1;
 		}
 		//узнать логин
@@ -73,7 +73,7 @@ int GetUserKeys (mpz_t xQ, mpz_t yQ, int iteration, char* login)
 	}
 	else
 	{
-		printf("End of file reached, no matches");
+		printf("End of file reached, no matches\n");
 		return -1;
 	}
 	
@@ -96,7 +96,6 @@ unsigned char *GenerateHashFromFile(FILE *file)
 {
 	fseek(file, -64, SEEK_END);
 	long fsize = ftell(file);
-	printf("size= %d\n", fsize);
 	fseek(file, 0, SEEK_SET);
 	unsigned char *content = (unsigned char *)malloc(fsize + 1);
 	fread(content, 1, fsize, file);
@@ -242,7 +241,7 @@ int main(int argc, char** argv)
 	//-h с лишними параметрами
 	else if (strcmp(argv[1], "-h") == 0 && argc != 2)
 	{
-		printf("Option \"-h\" does not support any other arguments");
+		printf("Option \"-h\" does not support any other arguments\n");
 		return 0;
 	}
 
@@ -259,7 +258,7 @@ int main(int argc, char** argv)
 	//статус открытого файла
 	char parfstatus = 0;
 	//получение параметров из файла
-	parfstatus += GetParams("ds_params.sdsp", p, a, b, m, q, xP, yP);
+	parfstatus += GetParams("/usr/local/etc/sds/ds_params", p, a, b, m, q, xP, yP);
 
 	//проверка подписи
 	if (strcmp(argv[1], "-ds") == 0 && argc == 3)
@@ -270,17 +269,20 @@ int main(int argc, char** argv)
 			//открытие целевого файла
 			if ((target = fopen(argv[2], "r")) == NULL)
 			{
-				printf("Error reading target file");
+				printf("Error reading target file\n");
 				Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
 				return 0;
 			}
-			//генерация подписи, добавление к файлу
-			CheckDS(p, a, b, m, q, xP, yP, xQ, yQ, target);
-			fclose(target);
+			else
+			{
+				//генерация подписи, добавление к файлу
+				CheckDS(p, a, b, m, q, xP, yP, xQ, yQ, target);
+				fclose(target);
+			}
 		}
 		//если параметры не получены
 		else
-			printf("Get the parameters first!");
+			printf("Get the parameters first!\n");
 		//очистить все переменные, используемые gmp
 		Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
 		return 0;
@@ -288,7 +290,7 @@ int main(int argc, char** argv)
 	//кол-во параметров неверно
 	else if (strcmp(argv[1], "-ds") == 0 && argc != 3)
 	{
-		printf("Incorrect number of arguments");
+		printf("Incorrect number of arguments\n");
 		Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
 		return 0;
 	}
@@ -296,19 +298,19 @@ int main(int argc, char** argv)
 	//параметры из файла
 	else if (strcmp(argv[1], "-p") == 0 && argc == 3)
 	{
-		printf("It doesnt work right now");
+		printf("It doesnt work right now\n");
 		Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
 		return 0;
 	}
 	else if (strcmp(argv[1], "-p") == 0 && argc != 3)
 	{
-		printf("Incorrect number of arguments");
+		printf("Incorrect number of arguments\n");
 		Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
 		return 0;
 	}
 
 	//параметр не найден
-	printf("No such parameter. Use \"-h\" to open list of options");
+	printf("No such parameter. Use \"-h\" to open list of options\n");
 	//очистить все переменные, используемые gmp
 	Clear_GMP(p, a, b, m, q, xP, yP, xQ, yQ);
 	return 0;
